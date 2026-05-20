@@ -3,6 +3,8 @@ package com.example.quiz_1141121.service;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+
+import com.example.quiz_1141121.util.JwtUtil;
 import org.springframework.util.StringUtils;
 
 import com.example.quiz_1141121.constants.ReplyMessage;
@@ -22,6 +24,8 @@ public class UserService {
 	private BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 	@Autowired
 	private UserDao userDao;
+	@Autowired
+	private JwtUtil jwtUtil; // 注入 JWT 工具類
 
 	// 新增使用者
 	public BasicRes register(RegisterReq req) {
@@ -77,10 +81,13 @@ public class UserService {
 					ReplyMessage.USER_PASSWORD_ERROR.getMessage());
 		}
 
-		// 4. 清除密碼 (避免回傳到前端)，回傳成功
+		// 4. 產生 JWT token（用 email 當 subject）
+		String token = jwtUtil.generateToken(user.getEmail());
+
+		// 5. 清除密碼（避免回傳到前端），回傳成功 + token
 		user.setPassword(null);
 		return new LoginRes(ReplyMessage.SUCCESS.getCode(), //
-				ReplyMessage.SUCCESS.getMessage(), user);
+				ReplyMessage.SUCCESS.getMessage(), user, token);
 	}
 
 	private BasicRes checkParams(RegisterReq req) {
