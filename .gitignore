@@ -42,3 +42,6 @@ out/
 ### Docker ###
 .env
 mysql_data/
+
+LEARNING_*.md
+
