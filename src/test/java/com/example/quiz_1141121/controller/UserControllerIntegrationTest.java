@@ -20,6 +20,9 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.web.client.DefaultResponseErrorHandler;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -42,6 +45,20 @@ class UserControllerIntegrationTest {
     @Container
     @ServiceConnection
     static MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.0");
+
+    // Redis 用 GenericContainer，Testcontainers 沒有專屬的 Redis 模組
+    // withExposedPorts：告訴 Testcontainers 要對外開放哪個 port
+    @Container
+    static GenericContainer<?> redis = new GenericContainer<>("redis:7.2-alpine")
+            .withExposedPorts(6379);
+
+    // @ServiceConnection 不支援 GenericContainer，所以要用 @DynamicPropertySource
+    // 讓 Spring Boot 啟動時動態讀到 Testcontainers 起的 Redis 的實際 host 和 port
+    @DynamicPropertySource
+    static void redisProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.data.redis.host", redis::getHost);
+        registry.add("spring.data.redis.port", () -> redis.getMappedPort(6379));
+    }
 
     // 用標準 RestTemplate，Spring Boot 4.x 移除了 TestRestTemplate
     private RestTemplate restTemplate;
