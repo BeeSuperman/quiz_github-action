@@ -11,7 +11,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -51,7 +53,7 @@ public class QuizService {// 注意這是最外層
 
 	@Transactional(rollbackFor = Exception.class)
 	// 當一個方法裡面一個DAO.多次方法或者不同DAO.方法時候要用 @Transactional ，這樣就兩個都成功兩個都不成功，否則容易有髒資料
-	
+	@CacheEvict(value = "quizList", allEntries = true) // 新增問卷後，清除問卷清單快取
 	/*
 	 * 一.新增問卷：
 	 */
@@ -222,6 +224,7 @@ public class QuizService {// 注意這是最外層
 		 */
 	}
 
+	@Cacheable(value = "quizList", key = "'all'") // 快取問卷清單，key 固定為 quizList::all
 	public GetQuizRes getQuizList() {
 		// 因為這個方法也是會返回code和message的，所以另外再生成一個新的res
 		// List<Quiz> list=quizDao.getAll();不寫這個後續使用匿名
@@ -229,7 +232,7 @@ public class QuizService {// 注意這是最外層
 
 	}
 //	這個方法的註解部分是教cache那裡內容
-//@Cacheable(cacheNames = "getQuestionList",key="#p0.toString()")
+	@Cacheable(value = "questionList", key = "#quizId") // 快取題目清單，key 為 questionList::{quizId}
 	public GetQuestionRes getQuestionList(int quizId) {
 //		System.out.println("=============="+LocalDateTime.now());
 //		if(quizId<=0) {
@@ -242,6 +245,7 @@ public class QuizService {// 注意這是最外層
 	}
 
 	// [新增] 獲取單個問卷的完整資訊 (包含問題)
+	@Cacheable(value = "quiz", key = "#quizId") // 快取單一問卷，key 為 quiz::{quizId}
 	public GetSingleQuizRes getQuiz(int quizId) {
 		Quiz quiz = quizDao.getById(quizId);
 		if (quiz == null) {
@@ -256,6 +260,11 @@ public class QuizService {// 注意這是最外層
 
 	//二。 編輯問卷：
 	@Transactional(rollbackFor = Exception.class)
+	@Caching(evict = {
+		@CacheEvict(value = "quiz", key = "#req.quizId"),         // 清除該問卷快取
+		@CacheEvict(value = "questionList", key = "#req.quizId"), // 清除該問卷的題目快取
+		@CacheEvict(value = "quizList", allEntries = true)        // 清除問卷清單快取
+	})
 	public UpdateRes update(UpdateReq req) {
 		/*
 		 * 因為是更新，所以要檢查quizId，因為存在DB中的quizId一定是大於0的，就算數據庫是AI的，但在 插入的時候是檢查PK是否存在，不存在則插入。
@@ -436,6 +445,7 @@ for (Integer id : oldIds) {
 
 	// 三。刪除多個的問卷
 	@Transactional(rollbackFor = Exception.class)
+	@CacheEvict(value = "quizList", allEntries = true) // 清除問卷清單快取
 	public BasicRes delete(DeleteReq req) {
 		/*
 		 * 檢查參數
@@ -465,6 +475,11 @@ for (Integer id : oldIds) {
 
 	// 刪除一個的問卷
 	@Transactional(rollbackFor = Exception.class)
+	@Caching(evict = {
+		@CacheEvict(value = "quiz", key = "#quizId"),         // 清除該問卷快取
+		@CacheEvict(value = "questionList", key = "#quizId"), // 清除該問卷的題目快取
+		@CacheEvict(value = "quizList", allEntries = true)    // 清除問卷清單快取
+	})
 	public BasicRes delete(int quizId) {
 		// 參數檢查
 		if (quizId <= 0) {

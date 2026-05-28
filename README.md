@@ -294,34 +294,125 @@ graph TD
 
 ## ⚡ 快速開始
 
-### 環境需求
+### 環境需求（前置確認）
 
-- **JDK** 17
-- **MySQL** 8.x
-- **Gradle** 8.x（或使用專案附帶的 `gradlew`）
+| 工具 | 說明 | 確認指令 |
+|------|------|---------|
+| **Docker Desktop** | 跑 MySQL 容器（必要） | `docker --version` |
+| **JDK 17** | 本地開發模式需要 | `java -version` |
+| **Git** | clone 專案 | `git --version` |
 
-### 安裝與啟動
+---
 
-```bash
-# 1. Clone 專案
-git clone https://github.com/your-username/quiz-backend.git
-cd quiz-backend
+### ⚠️ Git 沒有追蹤的檔案（換電腦或重新 clone 後必看）
 
-# 2. 建立 MySQL 資料庫
-# 在 MySQL 中執行：
-CREATE DATABASE quiz_1141121;
+以下檔案在 `.gitignore` 裡，**不會出現在 GitHub 上**，需要手動重建：
 
-# 3. 修改資料庫連線設定
-# 編輯 src/main/resources/application.properties
-spring.datasource.url=jdbc:mysql://localhost:3306/quiz_1141121?serverTimezone=GMT%2B8
-spring.datasource.username=root
-spring.datasource.password=your_password
+| 檔案 / 目錄 | 內容 | 如何重建 |
+|-------------|------|---------|
+| **`.env`** | 資料庫名稱與密碼 | 看下方「步驟一」手動建立 |
+| `mysql_data/` | MySQL 資料目錄（Docker volume） | 第一次 `docker-compose up` 自動產生 |
+| `build/` | Gradle 編譯輸出 | `./gradlew build` 重新產生 |
+| `.gradle/` | Gradle 本地快取 | `./gradlew build` 重新產生 |
+| `LEARNING_*.md` | 學習筆記 | 需自行備份到其他地方 |
+| `*.log` | 執行期 log | 不需要保存 |
 
-# 4. 啟動應用程式
-./gradlew bootRun
+**最重要的是 `.env`**，沒有它 `docker-compose up` 會報錯啟動失敗。請把這個檔案備份到安全的地方（密碼管理工具 / 隨身碟 / 私人雲端硬碟）。
+
+---
+
+### 啟動方式一：Full Docker（推薦，一鍵啟動）
+
+MySQL 和 Spring App 全部跑在 Docker 容器裡，**不需要本地安裝 JDK**。
+
+**步驟一：建立 `.env` 檔案**
+
+在專案根目錄（和 `docker-compose.yml` 同層）手動新增 `.env`：
+
+```
+DB_NAME=quiz_1141121
+DB_PASSWORD=root
 ```
 
-啟動後預設監聽 `http://localhost:8080`
+> 這個檔案會被 `docker-compose.yml` 讀取，設定 MySQL 容器的帳密。
+
+**步驟二：啟動所有容器**
+
+```powershell
+docker-compose up -d
+```
+
+**步驟三：確認都正常**
+
+```powershell
+# 查看容器狀態（db 和 spring-app 都應該是 running）
+docker-compose ps
+
+# 追蹤 Spring App 啟動 log（看到 Started Quiz1141121Application 才算成功）
+docker-compose logs -f spring-app
+```
+
+**步驟四：開啟 API 文件**
+
+- **Swagger UI**：http://localhost:8080/swagger-ui/index.html
+- **MySQL 連線**：host `localhost`，port `33066`，帳號 `root`，密碼同 `.env` 的 `DB_PASSWORD`
+
+**關閉：**
+
+```powershell
+docker-compose down
+```
+
+**重置資料庫（清空所有資料重新開始）：**
+
+```powershell
+docker-compose down
+Remove-Item -Recurse -Force mysql_data
+docker-compose up -d
+```
+
+---
+
+### 啟動方式二：本地開發模式（改程式碼時使用）
+
+只用 Docker 跑 MySQL，Spring App 直接在本地啟動（程式碼有 hot reload，改完不需重建 image）。
+
+**步驟一：確認 `.env` 存在**（同上方「啟動方式一」的步驟一）
+
+**步驟二：只啟動 MySQL 容器**
+
+```powershell
+docker-compose up -d db
+```
+
+**步驟三：確認 MySQL 就緒**
+
+```powershell
+docker-compose ps
+# db 那行的 STATUS 要顯示 (healthy)
+```
+
+**步驟四：啟動 Spring Boot**
+
+```powershell
+./gradlew bootRun --args="--spring.profiles.active=dev"
+```
+
+> `dev` profile（`application-dev.properties`）連線的是 `localhost:3306`，帳號 `root`，密碼 `123456`。
+> 注意：這個密碼和 `.env` 裡的 `DB_PASSWORD` 是不同的設定，分別給兩種啟動方式用。
+
+**步驟五：開啟 API 文件**
+
+- **Swagger UI**：http://localhost:8080/swagger-ui/index.html
+
+**停止：**
+
+按 `Ctrl + C` 停止 Spring App，然後：
+```powershell
+docker-compose down
+```
+
+---
 
 ### 查看 API 文件（Swagger UI）
 

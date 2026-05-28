@@ -44,4 +44,6 @@ out/
 mysql_data/
 
 LEARNING_*.md
+redis_data/
+
 
