@@ -4,6 +4,8 @@ import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -21,38 +23,39 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice //用來表示這是一個全域的 REST 例外處理器
 public class GlobalExceptionHandler {
 
+	private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
 	// @Valid 配合 Spring 會抛出 MethodArgumentNotValidException 異常；所以要針對此 Exception 處理
 	@ExceptionHandler({MethodArgumentNotValidException.class})
 	public ResponseEntity<Map<String, Object>> paramExceptionHandler(MethodArgumentNotValidException e) {
-		// 因為在 controller 中不符合資料驗證規則時，res 返回的是 code: 數值 和 message: 字串；所以 map 的 value 用 Object 接
-		// 字串 code 和 message 要跟 BasicRes 中的2個屬性名稱一樣 
+		String errorMsg = e.getAllErrors().get(0).getDefaultMessage();
+		// WARN：前端傳了不合法的參數，後端沒壞，用 WARN 而非 ERROR
+		log.warn("參數驗證失敗：{}", errorMsg);
+
 		Map<String, Object> errorMap = new HashMap<>();
-		// 將 req 中的參數檢查統一歸類為 bad_request，代碼為 400
 		errorMap.put("code", HttpStatus.BAD_REQUEST.value());
-		// 即使有多個錯誤參數，但還是一個個處理，所以會取第一個錯誤訊息
-		errorMap.put("message", e.getAllErrors().get(0).getDefaultMessage());
-		// 返回的 Http Status Code 為 badRequest(400)
+		errorMap.put("message", errorMsg);
 		return ResponseEntity.badRequest().body(errorMap);
 	}
-	
+
 	@ExceptionHandler({SQLException.class})
-	public ResponseEntity<Map<String, Object>> handleSQLException(SQLException e) {// 抓取 SQL Exception
-		// 因為在 controller 中的 res 返回的是 code: 數值 和 message: 字串；所以 map 的 value 用 Object 接
+	public ResponseEntity<Map<String, Object>> handleSQLException(SQLException e) {
+		// ERROR：資料庫操作失敗是嚴重問題，第三個參數 e 讓 Logback 輸出完整 stack trace
+		log.error("SQL 執行異常：{}", e.getMessage(), e);
+
 		Map<String, Object> errorMap = new HashMap<>();
-		// 將 SQL 發生的 Exception 歸類為 internal_server_error，代碼為 500
 		errorMap.put("code", HttpStatus.INTERNAL_SERVER_ERROR.value());
-		// 即使有多個錯誤參數，但還是一個個處理，所以會取第一個錯誤訊息
 		errorMap.put("message", e.getMessage());
 		return ResponseEntity.internalServerError().body(errorMap);
 	}
-	
+
 	@ExceptionHandler({Exception.class})
-	public ResponseEntity<Map<String, Object>> handleException(Exception e) {// 抓取 Exception
-		// 因為在 controller 中的 res 返回的是 code: 數值 和 message: 字串；所以 map 的 value 用 Object 接
+	public ResponseEntity<Map<String, Object>> handleException(Exception e) {
+		// ERROR：未預期錯誤，需要完整 stack trace 才能除錯
+		log.error("未預期的異常：{}", e.getMessage(), e);
+
 		Map<String, Object> errorMap = new HashMap<>();
-		// 將 SQL 發生的 Exception 歸類為 internal_server_error，代碼為 500
 		errorMap.put("code", HttpStatus.INTERNAL_SERVER_ERROR.value());
-		// 即使有多個錯誤參數，但還是一個個處理，所以會取第一個錯誤訊息
 		errorMap.put("message", e.getMessage());
 		return ResponseEntity.internalServerError().body(errorMap);
 	}

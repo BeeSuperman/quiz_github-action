@@ -8,8 +8,14 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import com.example.quiz_1141121.filter.JwtAuthFilter;
+
+import java.util.Arrays;
+import java.util.List;
 
 @Configuration
 // 告訴 Spring：這個類有 @Bean 方法，要把回傳值放進 Spring 容器
@@ -26,7 +32,10 @@ public class SecurityConfig {
     // SecurityFilterChain：定義整個安全規則的核心物件
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-            // 1. 關閉 CSRF 保護
+            // 1. 設定 CORS：允許指定來源的跨域請求，必須在 Security filter 層處理，@CrossOrigin 來不及
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+
+            // 2. 關閉 CSRF 保護
             // CSRF（跨站請求偽造）是給「有 Session 的瀏覽器應用」用的防護
             // 我們用 JWT（無狀態），不需要 CSRF 保護
             .csrf(csrf -> csrf.disable())
@@ -69,5 +78,20 @@ public class SecurityConfig {
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOrigins(Arrays.asList(
+            "http://localhost:4200",
+            "https://beesuperman.github.io"
+        ));
+        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedHeaders(List.of("*"));
+        config.setAllowCredentials(true);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
     }
 }

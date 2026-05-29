@@ -10,7 +10,7 @@
 	<!--定義日誌檔案的儲存地址-->
 	<property name="LogsLocation" value="logs" />
 	<!--格式化輸出：%d表示日期，%-5level：級別從左顯示5個字元寬度，%thread表示執行緒名，%msg：日誌訊息，%n是換行符-->
-	<property name="Format1" value="%d{HH:mm:ss.SSS} %-5level [%thread]%logger{50} - %msg%n" />
+	<property name="Format1" value="%d{HH:mm:ss.SSS} %-5level [%X{traceId}] [%thread] %logger{36} - %msg%n" />
 
 	<!-- appender -->
 	<!-- ConsoleAppender: 控制台輸出，其實就是System.out -->
