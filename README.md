@@ -149,8 +149,8 @@ public GetQuizRes getQuizList() { ... }
 public CreateRes create(CreateReq req) { ... }
 ```
 
-### 3. Testcontainers 整合測試
-測試時自動啟動真實的 MySQL 和 Redis Docker 容器，確保測試與生產環境行為一致，**徹底避免 Mock 與真實 DB 行為不符**：
+### 3.測試策略： 
+以 Mockito 撰寫 Service 層單元測試；以 Testcontainers 啟動真實 MySQL 與 Redis 容器進行 Controller 整合測試，確保本地與 CI 環境行為完全一致，CI/CD 無需額外設定基礎設施服務：
 
 ```java
 @Testcontainers
@@ -175,7 +175,7 @@ log.info("{} {} → {} ({}ms)", method, uri, status, duration);
 
 ### 5. GitHub Actions CI/CD Pipeline
 Push 到 `master` 後自動觸發三階段 Pipeline，**總耗時約 2.5 分鐘**，零手動介入完成持續部署：
-
+整合 GitHub Actions 建立三階段自動化 Pipeline，push 到 master 後依序執行測試、建置 Docker image 推送至 Docker Hub，並透過 SSH 自動部署至 AWS EC2（Ubuntu），實現零手動介入的持續部署流程，總耗時約 2.5 分鐘。部署端以 ngrok 建立永久 HTTPS Tunnel 並設定 systemd 服務開機自動啟動，解決 GitHub Pages（HTTPS）無法呼叫裸 HTTP API 的混合內容限制問題。
 ```
 push to master
       │
@@ -192,8 +192,8 @@ push to master
 
 前兩個 Job 失敗時自動中止，不會部署有問題的版本。
 
-### 6. 智慧差異更新（Diff Update Strategy）
-更新問卷題目時，**不刪除所有題目再重建**（避免作答記錄外鍵遺失），而是透過 Stream API 比對新舊 ID，精準執行「保留 / 新增 / 刪除」：
+### 6. 資料一致性：智慧差異更新（Diff Update Strategy）
+更新問卷題目時，**不刪除所有題目再重建**（避免作答記錄外鍵關聯遺失），而是透過 Stream API 比對新舊 ID，精準執行「保留 / 新增 / 刪除」：
 
 ```java
 List<Integer> idsToDelete = oldIds.stream()
@@ -209,6 +209,16 @@ if (!idsToDelete.isEmpty()) {
 - 固定定位導覽列與頁面內容重疊 → 各頁面加上對應 `margin-top`
 - 表格在手機上欄位過窄 → 加上 `overflow-x: auto` + `min-width` 支援橫向滑動
 - Modal 寬度固定 → 改為 `95vw` 自適應
+
+### 8.架構設計：
+嚴格遵循三層式架構（Controller / Service / DAO）進行模組化開發，搭配全域例外處理（@RestControllerAdvice）統一 API 回應格式，確保前端不會收到非預期的錯誤結構。透過自訂 LoggingFilter 整合 MDC Correlation ID，每筆請求自動注入唯一追蹤 ID，方便跨層日誌串聯排查。
+
+### 9.事務效能：
+ 運用 @Transactional 確保跨 DAO 多步驟操作的原子性；以 Redis 分散式快取搭配 @Cacheable / @CacheEvict 對高頻查詢建立快取策略，第二次起相同請求不觸發 SQL 查詢，寫入時自動清除對應快取確保資料一致性。
+ 
+ ### 10.安全設計： 
+ 以 BCrypt 加密儲存密碼，透過自訂 JWT Filter 實現無狀態身份驗證；登入成功後清除密碼欄位再回傳，防止敏感資料外洩。配置 Spring Security CORS 白名單，限定僅允許 GitHub Pages 前端跨域存取。
+
 
 ---
 
